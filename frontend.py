@@ -198,10 +198,71 @@ elif page in ["👤 Truy Vấn User", "📦 Truy Vấn Product"]:
                 c3.metric("🔴 Risky Reviews", format_number(result['risky_reviews']))
                 
             st.markdown("### 📋 DANH SÁCH REVIEWS")
-            df = pd.DataFrame(result['reviews'])
-            if len(df) > 0:
-                df['label'] = df['label'].apply(lambda x: "⚠️ ANOMALY" if x == 1 else "✅ NORMAL")
-                st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            reviews = result['reviews']
+            if reviews:
+                # Create summary dataframe
+                summary_data = []
+                for review in reviews:
+                    summary_data.append({
+                        'Review ID': review['review_id'][:12] + "...",
+                        'Rating': "⭐" * int(review.get('rating', 0)),
+                        'Status': "⚠️ ANOMALY" if review['label'] == 1 else "✅ NORMAL",
+                        'Anomaly Score': f"{review.get('hybrid_anomaly_score', 0):.4f}",
+                        'Helpful': review.get('helpful_vote', 0),
+                        'Verified': "✓" if review.get('verified_purchase', False) else "✗"
+                    })
+                
+                summary_df = pd.DataFrame(summary_data)
+                st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                st.markdown("### 💬 CHI TIẾT CỘT BÌNH LUẬN")
+                
+                # Display detailed reviews with comments
+                for idx, review in enumerate(reviews, 1):
+                    with st.expander(f"📝 Review #{idx} - {review['review_id'][:16]}... ({review.get('rating', '?')}⭐)", expanded=(idx==1)):
+                        col_info1, col_info2 = st.columns(2)
+                        
+                        with col_info1:
+                            st.write(f"**Review ID:** `{review['review_id']}`")
+                            st.write(f"**Rating:** {'⭐' * int(review.get('rating', 0))}")
+                            st.write(f"**Status:** {'⚠️ ANOMALY' if review['label'] == 1 else '✅ NORMAL'}")
+                            
+                        with col_info2:
+                            if not is_user:
+                                st.write(f"**User ID:** `{review.get('user_id', 'N/A')}`")
+                            st.write(f"**Helpful Votes:** {review.get('helpful_vote', 0)}")
+                            st.write(f"**Verified Purchase:** {'✓ Yes' if review.get('verified_purchase', False) else '✗ No'}")
+                        
+                        st.markdown("---")
+                        
+                        metric_col1, metric_col2, metric_col3 = st.columns(3)
+                        with metric_col1:
+                            st.metric("Anomaly Score", f"{review.get('hybrid_anomaly_score', 0):.4f}")
+                        with metric_col2:
+                            if 'graph_suspicion' in review:
+                                st.metric("Graph Suspicion", f"{review['graph_suspicion']:.4f}")
+                            else:
+                                st.metric("Semantic Suspicion", f"{review.get('semantic_suspicion', 0):.4f}")
+                        with metric_col3:
+                            risk_score = review.get('hybrid_anomaly_score', 0)
+                            if risk_score >= 0.8:
+                                st.metric("Risk Level", "🔴 CRITICAL")
+                            elif risk_score >= 0.6:
+                                st.metric("Risk Level", "🟠 HIGH")
+                            elif risk_score >= 0.3:
+                                st.metric("Risk Level", "🟡 MEDIUM")
+                            else:
+                                st.metric("Risk Level", "🟢 LOW")
+                        
+                        st.markdown("---")
+                        st.markdown("**📝 Bình luận (Comment):**")
+                        comment = review.get('comment', 'N/A')
+                        if comment and comment != 'N/A':
+                            st.info(comment)
+                        else:
+                            st.caption("Không có bình luận")
 
 elif page == "📈 Thống Kê & Xuất Báo Cáo":
     engine = load_engine()

@@ -141,12 +141,19 @@ class GraphStructureAnalyzer:
                 review_id = row['dst']
                 review_idx = self.extractor.review_id_to_idx.get(review_id)
                 if review_idx is not None and review_idx < len(self.extractor.labels):
-                    review_data.append({
+                    # Get review details from reviews_df
+                    review_row = self.extractor.reviews_df[self.extractor.reviews_df['review_id'] == review_id]
+                    review_info = {
                         'review_id': review_id,
                         'label': int(self.extractor.labels[review_idx]),
                         'hybrid_anomaly_score': float(self.extractor.hybrid_anomaly_scores[review_idx]),
-                        'graph_suspicion': float(self.extractor.graph_suspicion[review_idx])
-                    })
+                        'graph_suspicion': float(self.extractor.graph_suspicion[review_idx]),
+                        'rating': int(review_row['rating'].values[0]) if len(review_row) > 0 else 0,
+                        'helpful_vote': int(review_row['helpful_vote'].values[0]) if len(review_row) > 0 else 0,
+                        'verified_purchase': bool(review_row['verified_purchase'].values[0]) if len(review_row) > 0 else False,
+                        'comment': str(review_row['text_clean'].values[0]) if len(review_row) > 0 and pd.notna(review_row['text_clean'].values[0]) else 'N/A'
+                    }
+                    review_data.append(review_info)
             return {
                 'user_id': user_id,
                 'num_reviews': len(review_data),
@@ -154,7 +161,8 @@ class GraphStructureAnalyzer:
                 'avg_graph_suspicion': float(np.mean([r['graph_suspicion'] for r in review_data])) if review_data else 0,
                 'reviews': review_data[:50]
             }
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in get_user_review_pedigree: {e}")
             return {'user_id': user_id, 'num_reviews': 0, 'reviews': []}
     
     def get_product_review_pedigree(self, product_id: str) -> Dict[str, Any]:
@@ -165,12 +173,20 @@ class GraphStructureAnalyzer:
                 review_id = row['src']
                 review_idx = self.extractor.review_id_to_idx.get(review_id)
                 if review_idx is not None and review_idx < len(self.extractor.labels):
-                    review_data.append({
+                    # Get review details from reviews_df
+                    review_row = self.extractor.reviews_df[self.extractor.reviews_df['review_id'] == review_id]
+                    review_info = {
                         'review_id': review_id,
+                        'user_id': str(review_row['user_id'].values[0]) if len(review_row) > 0 else 'N/A',
                         'label': int(self.extractor.labels[review_idx]),
                         'hybrid_anomaly_score': float(self.extractor.hybrid_anomaly_scores[review_idx]),
-                        'semantic_suspicion': float(self.extractor.semantic_suspicion[review_idx])
-                    })
+                        'semantic_suspicion': float(self.extractor.semantic_suspicion[review_idx]),
+                        'rating': int(review_row['rating'].values[0]) if len(review_row) > 0 else 0,
+                        'helpful_vote': int(review_row['helpful_vote'].values[0]) if len(review_row) > 0 else 0,
+                        'verified_purchase': bool(review_row['verified_purchase'].values[0]) if len(review_row) > 0 else False,
+                        'comment': str(review_row['text_clean'].values[0]) if len(review_row) > 0 and pd.notna(review_row['text_clean'].values[0]) else 'N/A'
+                    }
+                    review_data.append(review_info)
             return {
                 'product_id': product_id,
                 'num_reviews': len(review_data),
@@ -178,7 +194,8 @@ class GraphStructureAnalyzer:
                 'risky_reviews': sum(1 for r in review_data if r['label'] == 1),
                 'reviews': review_data[:50]
             }
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in get_product_review_pedigree: {e}")
             return {'product_id': product_id, 'num_reviews': 0, 'reviews': []}
 
 class RiskAnalysisEngine:
